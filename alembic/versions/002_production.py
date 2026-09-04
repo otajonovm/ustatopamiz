@@ -51,9 +51,15 @@ def upgrade() -> None:
                 batch.create_unique_constraint("uq_masters_user_id", ["user_id"])
 
     orders_cols = _columns("orders")
+    inspector = sa.inspect(op.get_bind())
+    fk_names = {fk.get("name") for fk in inspector.get_foreign_keys("orders") if fk.get("name")}
     if "master_id" not in orders_cols:
-        op.add_column("orders", sa.Column("master_id", sa.Integer(), nullable=True))
-        op.create_foreign_key("fk_orders_master_id", "orders", "masters", ["master_id"], ["id"])
+        with op.batch_alter_table("orders") as batch:
+            batch.add_column(sa.Column("master_id", sa.Integer(), nullable=True))
+            batch.create_foreign_key("fk_orders_master_id", "masters", ["master_id"], ["id"])
+    elif "fk_orders_master_id" not in fk_names:
+        with op.batch_alter_table("orders") as batch:
+            batch.create_foreign_key("fk_orders_master_id", "masters", ["master_id"], ["id"])
     if "client_rating" not in orders_cols:
         op.add_column("orders", sa.Column("client_rating", sa.Integer(), nullable=True))
     if "taken_at" not in orders_cols:
@@ -108,10 +114,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("subscription_payments")
-    op.drop_constraint("fk_orders_master_id", "orders", type_="foreignkey")
-    op.drop_column("orders", "taken_at")
-    op.drop_column("orders", "client_rating")
-    op.drop_column("orders", "master_id")
+    with op.batch_alter_table("orders") as batch:
+        batch.drop_constraint("fk_orders_master_id", type_="foreignkey")
+        batch.drop_column("taken_at")
+        batch.drop_column("client_rating")
+        batch.drop_column("master_id")
     op.drop_column("masters", "warnings_count")
     op.drop_column("masters", "completed_orders_count")
     op.drop_column("masters", "rating")
