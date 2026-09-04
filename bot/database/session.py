@@ -1,3 +1,5 @@
+from os import getenv
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -8,6 +10,8 @@ def create_engine_and_session(database_url: str):
         kwargs["connect_args"] = {"check_same_thread": False}
         if ":memory:" in database_url:
             kwargs["poolclass"] = StaticPool
+    elif "+asyncpg" in database_url and getenv("DYNO"):
+        kwargs["connect_args"] = {"ssl": True}
     engine = create_async_engine(database_url, **kwargs)
     session_factory = async_sessionmaker(
         engine,

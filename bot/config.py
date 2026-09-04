@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     DEFAULT_GROUP_ID: int = 0
     GROUP_INVITE_LINK: str = ""
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            value = "postgresql+asyncpg://" + value.removeprefix("postgres://")
+        elif value.startswith("postgresql://"):
+            value = "postgresql+asyncpg://" + value.removeprefix("postgresql://")
+        return value
+
     @field_validator("ADMIN_IDS", mode="before")
     @classmethod
     def parse_admin_ids(cls, value: str | list[int] | None) -> list[int]:

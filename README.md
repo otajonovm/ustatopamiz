@@ -32,6 +32,15 @@ Mijoz muammo bo‘yicha e’lon qoldiradi — bot buyurtmani tegishli sohaning y
 
 Bot polling rejimida ishlaydi. PostgreSQL va Redis ham Compose ichida ko‘tariladi.
 
+## Heroku
+
+```bash
+git push heroku main
+heroku ps:scale worker=1 -a ustatopamiz
+```
+
+Worker dyno ishlatiladi (`web` emas). Config vars: `BOT_TOKEN`, `ADMIN_IDS`, `DEFAULT_GROUP_ID`, `GROUP_INVITE_LINK`. `DATABASE_URL` ni Heroku Postgres beradi.
+
 ## Lokal ishga tushirish (Docker siz)
 
 PostgreSQL va Redis oldindan ishlashi kerak. `.env` dagi `DATABASE_URL` va `REDIS_URL` `localhost` ga qaratilgan.
