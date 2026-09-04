@@ -1,0 +1,8 @@
+aiogram>=3.13,<4
+sqlalchemy[asyncio]>=2.0,<3
+asyncpg>=0.29
+alembic>=1.13
+redis>=5.0
+pydantic-settings>=2.4
+greenlet>=3.0
+aiosqlite>=0.20
