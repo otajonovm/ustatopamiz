@@ -20,6 +20,8 @@ async def seed_categories(session: AsyncSession, default_group_id: int = 0) -> N
             continue
         if default_group_id:
             category.group_id = default_group_id
+        if category.name != name:
+            category.name = name
     await session.commit()
 
 

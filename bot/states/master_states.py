@@ -5,3 +5,7 @@ class MasterRegistration(StatesGroup):
     category = State()
     region = State()
     experience = State()
+
+
+class SubscriptionPaymentState(StatesGroup):
+    receipt = State()

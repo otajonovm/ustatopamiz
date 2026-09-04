@@ -73,9 +73,9 @@ python -m bot.main
 
 ## Sohalar va hududlar
 
-**Sohalar:** Santexnika, Elektr, Muzlatgich/Konditsioner, Qurilish.
+**Sohalar:** Santexnika, Elektr, Maishiy texnika, Qurilish, Payvandchi, Mebel/Duradgor, Gaz/Kotyol, Avtoservis.
 
-**Hududlar (Beshariq):** Markaz, Rapqon, Oqtepa, Tovul, Boshqa.
+**Hududlar (Beshariq):** Markaz, Rapqon, Oqtepa, Tovul, Nayman, Zarqishloq, Qoraqum, Qaqir, Vatan, Beshsart, Yakkatut, Boshqa.
 
 ## Qo‘lda test checklist
 

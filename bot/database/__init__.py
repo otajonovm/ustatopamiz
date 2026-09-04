@@ -1,5 +1,5 @@
 from bot.database.base import Base
-from bot.database.models import Category, Master, Order, User
+from bot.database.models import Category, Master, Order, SubscriptionPayment, User
 from bot.database.session import create_engine_and_session
 
 __all__ = [
@@ -7,6 +7,7 @@ __all__ = [
     "Category",
     "Master",
     "Order",
+    "SubscriptionPayment",
     "User",
     "create_engine_and_session",
 ]

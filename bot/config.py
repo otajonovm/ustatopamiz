@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     DEFAULT_REGION: str = "Beshariq"
     DEFAULT_GROUP_ID: int = 0
     GROUP_INVITE_LINK: str = ""
+    PAYMENT_CARD: str = "8600 0000 0000 0000"
+    SUBSCRIPTION_AMOUNT: int = 30000
+    SUBSCRIPTION_DAYS: int = 30
+    TIMEZONE: str = "Asia/Tashkent"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

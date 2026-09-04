@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import Settings
-from bot.database.models import User, UserRole
+from bot.database.models import Master, MasterStatus, User
 
 
 class IsAdmin(BaseFilter):
@@ -17,5 +17,9 @@ class IsMaster(BaseFilter):
     async def __call__(self, event: Message | CallbackQuery, session: AsyncSession) -> bool:
         if event.from_user is None:
             return False
-        user = await session.scalar(select(User).where(User.telegram_id == event.from_user.id))
-        return bool(user and user.role == UserRole.MASTER and user.is_verified)
+        master = await session.scalar(
+            select(Master)
+            .join(User)
+            .where(User.telegram_id == event.from_user.id, Master.status == MasterStatus.APPROVED)
+        )
+        return master is not None

@@ -11,15 +11,18 @@ from aiogram.types import ErrorEvent
 
 from bot.config import get_settings
 from bot.database.base import Base
-from bot.database.models import Category, Master, Order, User  # noqa: F401
+from bot.database.models import Category, Master, Order, SubscriptionPayment, User  # noqa: F401
 from bot.database.seed import seed_categories
 from bot.database.session import create_engine_and_session
 from bot.handlers.admin import router as admin_router
 from bot.handlers.client import router as client_router
 from bot.handlers.common import router as common_router
 from bot.handlers.master import router as master_router
-from bot.middlewares.db import DbSessionMiddleware
-from bot.services.telegram_service import notify_admins, resolve_group_chat
+from bot.handlers.moderation import router as moderation_router
+from bot.middlewares.ban_check import BanCheckMiddleware
+from bot.middlewares.db_session import DbSessionMiddleware
+from bot.services.scheduler import setup_scheduler
+from bot.services.telegram_helpers import notify_admins, resolve_group_chat
 
 logger = logging.getLogger(__name__)
 
@@ -45,19 +48,18 @@ async def main() -> None:
     if settings.DEFAULT_GROUP_ID:
         logger.info("Barcha sohalar guruhi: %s", settings.DEFAULT_GROUP_ID)
 
-    if settings.REDIS_URL.startswith("redis://"):
+    if settings.REDIS_URL.startswith(("redis://", "rediss://")):
         storage = RedisStorage.from_url(settings.REDIS_URL)
     else:
         storage = MemoryStorage()
         logger.info("FSM xotirada (Redis yo'q)")
-    bot = Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+
+    bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=storage)
     dp["settings"] = settings
     dp.update.middleware(DbSessionMiddleware(session_factory))
-    dp.include_routers(admin_router, common_router, client_router, master_router)
+    dp.update.middleware(BanCheckMiddleware())
+    dp.include_routers(admin_router, moderation_router, common_router, client_router, master_router)
 
     @dp.error()
     async def on_error(event: ErrorEvent) -> None:
@@ -69,29 +71,25 @@ async def main() -> None:
             except Exception:
                 logger.warning("Foydalanuvchiga xato xabari yuborilmadi")
 
-    logger.info("Usta Topamiz bot ishga tushmoqda")
+    scheduler = setup_scheduler(bot, session_factory, settings)
+    logger.info("Usta Topamiz production bot ishga tushmoqda")
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         chat = await resolve_group_chat(bot, settings.DEFAULT_GROUP_ID)
         if chat:
             logger.info("Guruh topildi: %s (%s)", chat.id, chat.title)
         else:
-            logger.warning(
-                "Bot guruhni ko'rmayapti. @ustatopamiz_uzbot ni guruhga admin qilib qo'shing, "
-                "keyin guruhda /group_id yuboring."
-            )
+            logger.warning("Bot guruhni ko'rmayapti. Guruhga admin qilib qo'shing, keyin /group_id yuboring.")
             if settings.GROUP_INVITE_LINK:
                 await notify_admins(
                     bot,
                     settings,
-                    "⚠️ Bot hozircha guruhni topa olmayapti.\n\n"
-                    "1) Guruhga @ustatopamiz_uzbot ni qo'shing\n"
-                    "2) Uni administrator qiling (xabar yuborish + havola yaratish)\n"
-                    "3) Guruhda /group_id yozing\n\n"
-                    f"Guruh havolasi: {settings.GROUP_INVITE_LINK}",
+                    "⚠️ Bot guruhni topa olmayapti. @ustatopamiz_uzbot ni admin qiling va /group_id yozing.\n"
+                    f"{settings.GROUP_INVITE_LINK}",
                 )
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        scheduler.shutdown(wait=False)
         await bot.session.close()
         await storage.close()
         await engine.dispose()

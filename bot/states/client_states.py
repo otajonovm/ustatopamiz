@@ -5,3 +5,7 @@ class OrderCreation(StatesGroup):
     category = State()
     region = State()
     description = State()
+
+
+class RatingState(StatesGroup):
+    waiting = State()

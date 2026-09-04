@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from bot.config import get_settings
 from bot.database.base import Base
-from bot.database.models import Category, Master, Order, User  # noqa: F401
+from bot.database.models import Category, Master, Order, SubscriptionPayment, User  # noqa: F401
 
 config = context.config
 settings = get_settings()

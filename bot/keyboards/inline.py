@@ -17,7 +17,7 @@ def regions_kb(prefix: str = "reg") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for region in REGIONS:
         builder.button(text=region, callback_data=f"{prefix}:{region}")
-    builder.adjust(2)
+    builder.adjust(3)
     return builder.as_markup()
 
 
@@ -29,10 +29,39 @@ def master_review_kb(master_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def order_contact_kb(telegram_id: int, username: str | None) -> InlineKeyboardMarkup:
+def moderation_kb(order_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    if username:
-        builder.button(text="📞 Bog'lanish", url=f"https://t.me/{username}")
-    else:
-        builder.button(text="📞 Bog'lanish", url=f"tg://user?id={telegram_id}")
+    builder.button(text="✅ Kanalga chiqarish", callback_data=f"mod:ok:{order_id}")
+    builder.button(text="❌ Spam/Rad etish", callback_data=f"mod:no:{order_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def take_job_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🛠 Ishni olish", callback_data=f"take:{order_id}")
+    return builder.as_markup()
+
+
+def client_job_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Ish muvaffaqiyatli bajarildi", callback_data=f"done:{order_id}")
+    builder.button(text="⚠️ Usta bog'lanmadi / Ish bekor", callback_data=f"reopen:{order_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def rating_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for stars in range(1, 6):
+        builder.button(text="⭐" * stars, callback_data=f"rate:{order_id}:{stars}")
+    builder.adjust(5)
+    return builder.as_markup()
+
+
+def payment_review_kb(payment_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ To'lovni tasdiqlash", callback_data=f"pay:ok:{payment_id}")
+    builder.button(text="❌ Chek xato", callback_data=f"pay:no:{payment_id}")
+    builder.adjust(1)
     return builder.as_markup()
