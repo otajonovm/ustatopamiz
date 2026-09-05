@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bot.database.base import Base
@@ -38,6 +38,7 @@ class Master(Base):
     rating: Mapped[float] = mapped_column(Float, default=5.0, server_default="5.0")
     completed_orders_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     warnings_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    portfolio_photo_ids: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
 
     user: Mapped["User"] = relationship(back_populates="masters")
     category: Mapped["Category"] = relationship(back_populates="masters")

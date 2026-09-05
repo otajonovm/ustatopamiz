@@ -3,7 +3,8 @@ import html
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.exceptions import TelegramAPIError
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import Settings
@@ -16,9 +17,8 @@ router = Router(name="common")
 HELP_TEXT = (
     "<b>Usta Topamiz</b> — Beshariq tumanidagi mijozlar va ustalarni bog'laydi.\n\n"
     "📝 Buyurtma — soha, hudud, muammo. Avval admin tekshiradi, keyin ustalarga chiqadi.\n"
-    "👷 Usta — ariza, obuna (30 kun) va ish olish.\n"
-    "💳 Obuna — karta orqali to'lov chekini yuboring.\n\n"
-    "/cancel — bekor qilish"
+    "👷 Usta — ariza, ish rasmlari, tasdiq va ish olish.\n\n"
+    "Jarayonni bekor qilish: xabardagi ❌ tugma yoki /cancel"
 )
 
 
@@ -58,9 +58,21 @@ async def cmd_help(message: Message, state: FSMContext, session: AsyncSession, s
     await message.answer(HELP_TEXT, reply_markup=main_menu_kb(user))
 
 
+@router.callback_query(F.data == "flow:cancel")
+async def cancel_flow(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings) -> None:
+    await state.clear()
+    user = await get_or_create_user(session, callback.from_user, settings)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramAPIError:
+        pass
+    await callback.message.answer("Bekor qilindi.", reply_markup=main_menu_kb(user))
+    await callback.answer()
+
+
 @router.message(Command("cancel"))
 @router.message(F.text == BTN_CANCEL)
 async def cmd_cancel(message: Message, state: FSMContext, session: AsyncSession, settings: Settings) -> None:
     await state.clear()
     user = await get_or_create_user(session, message.from_user, settings)
-    await message.answer("Asosiy menyu.", reply_markup=main_menu_kb(user))
+    await message.answer("Bekor qilindi.", reply_markup=main_menu_kb(user))

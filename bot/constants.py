@@ -31,3 +31,5 @@ BTN_HELP = "ℹ️ Yordam"
 BTN_CANCEL = "❌ Bekor qilish"
 BTN_SHARE_PHONE = "📱 Telefon raqamni yuborish"
 BTN_SKIP_EXPERIENCE = "O'tkazib yuborish"
+MIN_PORTFOLIO_PHOTOS = 2
+MAX_PORTFOLIO_PHOTOS = 5

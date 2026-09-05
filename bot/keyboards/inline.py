@@ -1,8 +1,19 @@
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.constants import REGIONS
 from bot.database.models import Category
+
+
+def cancel_inline_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="❌ Bekor qilish", callback_data="flow:cancel")
+    return builder.as_markup()
+
+
+def _with_cancel(builder: InlineKeyboardBuilder) -> InlineKeyboardMarkup:
+    builder.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="flow:cancel"))
+    return builder.as_markup()
 
 
 def categories_kb(categories: list[Category], prefix: str = "cat") -> InlineKeyboardMarkup:
@@ -10,7 +21,7 @@ def categories_kb(categories: list[Category], prefix: str = "cat") -> InlineKeyb
     for category in categories:
         builder.button(text=category.name, callback_data=f"{prefix}:{category.id}")
     builder.adjust(2)
-    return builder.as_markup()
+    return _with_cancel(builder)
 
 
 def regions_kb(prefix: str = "reg") -> InlineKeyboardMarkup:
@@ -18,6 +29,23 @@ def regions_kb(prefix: str = "reg") -> InlineKeyboardMarkup:
     for region in REGIONS:
         builder.button(text=region, callback_data=f"{prefix}:{region}")
     builder.adjust(3)
+    return _with_cancel(builder)
+
+
+def experience_inline_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="O'tkazib yuborish", callback_data="mexp:skip")
+    builder.button(text="❌ Bekor qilish", callback_data="flow:cancel")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def portfolio_kb(count: int, minimum: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if count >= minimum:
+        builder.button(text=f"✅ Yuborish ({count} ta rasm)", callback_data="mport:done")
+    builder.button(text="❌ Bekor qilish", callback_data="flow:cancel")
+    builder.adjust(1)
     return builder.as_markup()
 
 

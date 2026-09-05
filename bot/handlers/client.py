@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.config import Settings
 from bot.constants import BTN_NEW_ORDER, REGIONS
 from bot.database.models import Category, OrderStatus
-from bot.keyboards.inline import categories_kb, moderation_kb, rating_kb, regions_kb
-from bot.keyboards.reply import cancel_kb, main_menu_kb, phone_request_kb
+from bot.keyboards.inline import cancel_inline_kb, categories_kb, moderation_kb, rating_kb, regions_kb
+from bot.keyboards.reply import main_menu_kb, phone_request_kb
 from bot.services.order_service import apply_rating, create_order, load_order
 from bot.services.telegram_helpers import notify_admins, restore_order_in_group
 from bot.services.user_service import client_has_open_order, get_or_create_user
@@ -45,8 +45,8 @@ async def start_order(message: Message, state: FSMContext, session: AsyncSession
     await state.clear()
     categories = list(await session.scalars(select(Category).where(Category.is_active.is_(True)).order_by(Category.id)))
     await state.set_state(OrderCreation.category)
-    await message.answer("Qaysi soha bo'yicha usta kerak?", reply_markup=categories_kb(categories, "cat"))
-    await message.answer("Bekor qilish uchun tugmani bosing.", reply_markup=cancel_kb())
+    await message.answer("Qaysi soha bo'yicha usta kerak?", reply_markup=main_menu_kb(user))
+    await message.answer("Sohani tanlang:", reply_markup=categories_kb(categories, "cat"))
 
 
 @router.callback_query(OrderCreation.category, F.data.startswith("cat:"))
@@ -76,7 +76,8 @@ async def choose_region(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.edit_text(
         f"Soha: <b>{html.escape(data.get('category_name', ''))}</b>\n"
         f"Hudud: <b>{html.escape(region)}</b>\n\n"
-        "Muammoni matn, rasm yoki ovozli xabar sifatida yuboring."
+        "Muammoni matn, rasm yoki ovozli xabar sifatida yuboring.",
+        reply_markup=cancel_inline_kb(),
     )
     await callback.answer()
 

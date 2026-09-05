@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
-from aiogram.types import InlineKeyboardMarkup, Message
+from aiogram.types import InlineKeyboardMarkup, InputMediaPhoto, Message
 
 from bot.config import Settings
 from bot.database.models import Category, Master, Order, User
@@ -38,7 +38,7 @@ def format_order_taken(order: Order, master_name: str) -> str:
     )
 
 
-def format_master_application(master: Master, user: User, category: Category) -> str:
+def format_master_application(master: Master, user: User, category: Category, photo_count: int = 0) -> str:
     experience = f"{master.experience_years} yil" if master.experience_years is not None else "Ko'rsatilmagan"
     phone = user.phone_number or "Ko'rsatilmagan"
     return (
@@ -48,8 +48,24 @@ def format_master_application(master: Master, user: User, category: Category) ->
         f"📞 Telefon: <code>{html.escape(phone)}</code>\n"
         f"🔧 Soha: <b>{html.escape(category.name)}</b>\n"
         f"📍 Hudud: {html.escape(master.region)}\n"
-        f"🛠 Tajriba: {html.escape(experience)}"
+        f"🛠 Tajriba: {html.escape(experience)}\n"
+        f"🖼 Ish rasmlari: {photo_count} ta"
     )
+
+
+async def send_photos_to_admins(bot: Bot, settings: Settings, photo_ids: list[str], caption: str) -> None:
+    if not photo_ids:
+        return
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            if len(photo_ids) == 1:
+                await bot.send_photo(admin_id, photo=photo_ids[0], caption=caption)
+                continue
+            media = [InputMediaPhoto(media=photo_id) for photo_id in photo_ids[:10]]
+            media[0].caption = caption
+            await bot.send_media_group(admin_id, media=media)
+        except TelegramBadRequest:
+            logger.warning("Admin %s ga ish rasmlari yuborilmadi", admin_id)
 
 
 async def notify_admins(

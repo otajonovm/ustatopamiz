@@ -22,6 +22,8 @@ def _aware(value: datetime) -> datetime:
 
 
 async def check_subscriptions(bot: Bot, session_factory: async_sessionmaker, settings: Settings) -> None:
+    if not settings.REQUIRE_SUBSCRIPTION:
+        return
     now = datetime.now(timezone.utc)
     soon = now + timedelta(days=3)
     async with session_factory() as session:

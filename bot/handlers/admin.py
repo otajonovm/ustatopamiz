@@ -127,7 +127,7 @@ async def approve_master(callback: CallbackQuery, session: AsyncSession, setting
     text = (
         f"✅ Arizangiz tasdiqlandi!\nSoha: <b>{html.escape(master.category.name)}</b>\n"
         f"Hudud: {html.escape(master.region)}\n\n"
-        "Ish olish uchun obuna kerak. Botdagi «Obunani to'lash» ni bosing.\n"
+        "Endi guruhdagi buyurtmalarni olishingiz mumkin.\n"
     )
     if invite_link:
         text += f"\nGuruh havolasi:\n{invite_link}"

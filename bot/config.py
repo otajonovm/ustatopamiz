@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     PAYMENT_CARD: str = "8600 0000 0000 0000"
     SUBSCRIPTION_AMOUNT: int = 30000
     SUBSCRIPTION_DAYS: int = 30
+    REQUIRE_SUBSCRIPTION: bool = False
     TIMEZONE: str = "Asia/Tashkent"
 
     @field_validator("DATABASE_URL", mode="before")
