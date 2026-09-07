@@ -16,10 +16,14 @@ async def create_order(
     description: str | None,
     voice_id: str | None,
     photo_id: str | None,
+    village_id: int | None = None,
+    custom_address: str | None = None,
 ) -> Order:
     order = Order(
         client_id=client_id,
         category_id=category_id,
+        village_id=village_id,
+        custom_address=custom_address,
         region=region,
         description=description,
         voice_id=voice_id,
@@ -31,7 +35,12 @@ async def create_order(
     return await session.scalar(
         select(Order)
         .where(Order.id == order.id)
-        .options(selectinload(Order.client), selectinload(Order.category), selectinload(Order.master))
+        .options(
+            selectinload(Order.client),
+            selectinload(Order.category),
+            selectinload(Order.master),
+            selectinload(Order.village),
+        )
     )
 
 
@@ -42,7 +51,9 @@ async def load_order(session: AsyncSession, order_id: int, *, for_update: bool =
         .options(
             selectinload(Order.client),
             selectinload(Order.category),
+            selectinload(Order.village),
             selectinload(Order.master).selectinload(Master.user),
+            selectinload(Order.master).selectinload(Master.village),
         )
     )
     if for_update:

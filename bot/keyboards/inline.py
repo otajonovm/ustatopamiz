@@ -1,8 +1,8 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from bot.constants import REGIONS
-from bot.database.models import Category
+from bot.constants import EXPERIENCE_OPTIONS, QURILISH_SKILLS, VILLAGE_PAGE_SIZE
+from bot.database.models import Category, Village
 
 
 def cancel_inline_kb() -> InlineKeyboardMarkup:
@@ -11,40 +11,75 @@ def cancel_inline_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def _with_cancel(builder: InlineKeyboardBuilder) -> InlineKeyboardMarkup:
-    builder.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="flow:cancel"))
-    return builder.as_markup()
+def _cancel_row() -> list[InlineKeyboardButton]:
+    return [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="flow:cancel")]
 
 
-def categories_kb(categories: list[Category], prefix: str = "cat") -> InlineKeyboardMarkup:
+def categories_kb(categories: list[Category], prefix: str = "cat", *, include_other: bool = True) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for category in categories:
         builder.button(text=category.name, callback_data=f"{prefix}:{category.id}")
-    builder.adjust(2)
-    return _with_cancel(builder)
+    builder.adjust(1)
+    if include_other:
+        builder.row(InlineKeyboardButton(text="✏️ Boshqa soha", callback_data=f"{prefix}:other"))
+    builder.row(*_cancel_row())
+    return builder.as_markup()
 
 
-def regions_kb(prefix: str = "reg") -> InlineKeyboardMarkup:
+def villages_kb(villages: list[Village], page: int, kind: str) -> InlineKeyboardMarkup:
+    total = max(1, (len(villages) + VILLAGE_PAGE_SIZE - 1) // VILLAGE_PAGE_SIZE)
+    page = max(0, min(page, total - 1))
+    start = page * VILLAGE_PAGE_SIZE
+    chunk = villages[start : start + VILLAGE_PAGE_SIZE]
     builder = InlineKeyboardBuilder()
-    for region in REGIONS:
-        builder.button(text=region, callback_data=f"{prefix}:{region}")
-    builder.adjust(3)
-    return _with_cancel(builder)
+    for village in chunk:
+        builder.button(text=village.name, callback_data=f"vid:{kind}:{village.id}")
+    builder.adjust(2)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="⬅️", callback_data=f"vpg:{kind}:{page - 1}"))
+    if page < total - 1:
+        nav.append(InlineKeyboardButton(text="➡️", callback_data=f"vpg:{kind}:{page + 1}"))
+    if nav:
+        builder.row(*nav)
+    builder.row(InlineKeyboardButton(text="✏️ Boshqa hudud", callback_data=f"voth:{kind}"))
+    builder.row(*_cancel_row())
+    return builder.as_markup()
+
+
+def skills_kb(selected: list[str]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for skill in QURILISH_SKILLS:
+        mark = "✅ " if skill in selected else ""
+        builder.button(text=f"{mark}{skill}", callback_data=f"skill:{skill}")
+    builder.adjust(2)
+    if selected:
+        builder.row(InlineKeyboardButton(text="Davom etish ➡️", callback_data="skill:done"))
+    builder.row(*_cancel_row())
+    return builder.as_markup()
 
 
 def experience_inline_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="O'tkazib yuborish", callback_data="mexp:skip")
-    builder.button(text="❌ Bekor qilish", callback_data="flow:cancel")
+    for option in EXPERIENCE_OPTIONS:
+        builder.button(text=option, callback_data=f"mexp:{option}")
     builder.adjust(1)
+    builder.row(*_cancel_row())
     return builder.as_markup()
 
 
 def portfolio_kb(count: int, minimum: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if count >= minimum:
-        builder.button(text=f"✅ Yuborish ({count} ta rasm)", callback_data="mport:done")
-    builder.button(text="❌ Bekor qilish", callback_data="flow:cancel")
+        builder.button(text=f"✅ Davom etish ({count} ta rasm)", callback_data="mport:done")
+    builder.row(*_cancel_row())
+    return builder.as_markup()
+
+
+def confirm_master_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Hammasi to'g'ri", callback_data="mconf:ok")
+    builder.button(text="🔄 Boshidan boshlash", callback_data="mconf:restart")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -53,13 +88,30 @@ def master_review_kb(master_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Tasdiqlash", callback_data=f"master:ok:{master_id}")
     builder.button(text="❌ Rad etish", callback_data=f"master:no:{master_id}")
-    builder.adjust(2)
+    builder.button(text="🔄 Sohani o'zgartirish", callback_data=f"master:recat:{master_id}")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def recat_kb(master_id: int, categories: list[Category]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for category in categories:
+        builder.button(text=category.name, callback_data=f"master:setcat:{master_id}:{category.id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def suggestion_kb(suggestion_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Darhol menyuga qo'shish", callback_data=f"sug:ok:{suggestion_id}")
+    builder.button(text="🗑 Spam/O'chirish", callback_data=f"sug:no:{suggestion_id}")
+    builder.adjust(1)
     return builder.as_markup()
 
 
 def moderation_kb(order_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Kanalga chiqarish", callback_data=f"mod:ok:{order_id}")
+    builder.button(text="✅ Guruhga chiqarish", callback_data=f"mod:ok:{order_id}")
     builder.button(text="❌ Spam/Rad etish", callback_data=f"mod:no:{order_id}")
     builder.adjust(1)
     return builder.as_markup()

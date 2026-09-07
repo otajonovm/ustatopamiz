@@ -11,8 +11,8 @@ from aiogram.types import ErrorEvent
 
 from bot.config import get_settings
 from bot.database.base import Base
-from bot.database.models import Category, Master, Order, SubscriptionPayment, User  # noqa: F401
-from bot.database.seed import seed_categories
+from bot.database.models import Category, Master, Order, Suggestion, SubscriptionPayment, User, Village  # noqa: F401
+from bot.database.seed import seed_initial_data
 from bot.database.session import create_engine_and_session
 from bot.handlers.admin import router as admin_router
 from bot.handlers.client import router as client_router
@@ -44,7 +44,7 @@ async def main() -> None:
             await connection.run_sync(Base.metadata.create_all)
 
     async with session_factory() as session:
-        await seed_categories(session, settings.DEFAULT_GROUP_ID)
+        await seed_initial_data(session, settings.DEFAULT_GROUP_ID)
     if settings.DEFAULT_GROUP_ID:
         logger.info("Barcha sohalar guruhi: %s", settings.DEFAULT_GROUP_ID)
 

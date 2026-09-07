@@ -9,11 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import Settings
-from bot.constants import BTN_NEW_ORDER, REGIONS
-from bot.database.models import Category, OrderStatus
-from bot.keyboards.inline import cancel_inline_kb, categories_kb, moderation_kb, rating_kb, regions_kb
+from bot.constants import BTN_NEW_ORDER
+from bot.database.models import Category, OrderStatus, Village
+from bot.keyboards.inline import cancel_inline_kb, categories_kb, moderation_kb, rating_kb, villages_kb
 from bot.keyboards.reply import main_menu_kb, phone_request_kb
 from bot.services.order_service import apply_rating, create_order, load_order
+from bot.services.suggestion_service import get_or_create_custom_category, record_suggestion
 from bot.services.telegram_helpers import notify_admins, restore_order_in_group
 from bot.services.user_service import client_has_open_order, get_or_create_user
 from bot.states.client_states import OrderCreation
@@ -30,6 +31,24 @@ async def _require_phone(message: Message, session: AsyncSession, settings: Sett
     return None
 
 
+async def _active_villages(session: AsyncSession) -> list[Village]:
+    return list(await session.scalars(select(Village).where(Village.is_active.is_(True)).order_by(Village.order_index, Village.id)))
+
+
+async def _active_categories(session: AsyncSession) -> list[Category]:
+    return list(await session.scalars(select(Category).where(Category.is_active.is_(True)).order_by(Category.id)))
+
+
+async def _ask_village(callback: CallbackQuery, state: FSMContext, session: AsyncSession, page: int = 0) -> None:
+    data = await state.get_data()
+    villages = await _active_villages(session)
+    await state.set_state(OrderCreation.village)
+    await callback.message.edit_text(
+        f"Soha: <b>{html.escape(data.get('category_name', ''))}</b>\nHududni tanlang:",
+        reply_markup=villages_kb(villages, page, "c"),
+    )
+
+
 @router.message(F.text == BTN_NEW_ORDER)
 async def start_order(message: Message, state: FSMContext, session: AsyncSession, settings: Settings) -> None:
     user = await _require_phone(message, session, settings)
@@ -43,10 +62,43 @@ async def start_order(message: Message, state: FSMContext, session: AsyncSession
         return
 
     await state.clear()
-    categories = list(await session.scalars(select(Category).where(Category.is_active.is_(True)).order_by(Category.id)))
+    categories = await _active_categories(session)
     await state.set_state(OrderCreation.category)
     await message.answer("Qaysi soha bo'yicha usta kerak?", reply_markup=main_menu_kb(user))
     await message.answer("Sohani tanlang:", reply_markup=categories_kb(categories, "cat"))
+
+
+@router.callback_query(OrderCreation.category, F.data == "cat:other")
+async def client_other_category(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(OrderCreation.custom_category)
+    await callback.message.edit_text("Kerakli sohani yozing:", reply_markup=cancel_inline_kb())
+    await callback.answer()
+
+
+@router.message(OrderCreation.custom_category, F.text)
+async def client_save_custom_category(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    settings: Settings,
+) -> None:
+    text = (message.text or "").strip()
+    if len(text) < 3:
+        await message.answer("Kamida 3 ta harf yozing.")
+        return
+    try:
+        await record_suggestion(session, message.bot, settings, suggestion_type="category", raw_text=text)
+        category = await get_or_create_custom_category(session, text)
+    except ValueError:
+        await message.answer("Noto'g'ri nom.")
+        return
+    await state.update_data(category_id=category.id, category_name=category.name)
+    villages = await _active_villages(session)
+    await state.set_state(OrderCreation.village)
+    await message.answer(
+        f"Soha: <b>{html.escape(category.name)}</b>\nHududni tanlang:",
+        reply_markup=villages_kb(villages, 0, "c"),
+    )
 
 
 @router.callback_query(OrderCreation.category, F.data.startswith("cat:"))
@@ -56,30 +108,66 @@ async def choose_category(callback: CallbackQuery, state: FSMContext, session: A
         await callback.answer("Bu soha mavjud emas.", show_alert=True)
         return
     await state.update_data(category_id=category.id, category_name=category.name)
-    await state.set_state(OrderCreation.region)
-    await callback.message.edit_text(
-        f"Soha: <b>{html.escape(category.name)}</b>\nHududni tanlang:",
-        reply_markup=regions_kb("reg"),
-    )
+    await _ask_village(callback, state, session)
     await callback.answer()
 
 
-@router.callback_query(OrderCreation.region, F.data.startswith("reg:"))
-async def choose_region(callback: CallbackQuery, state: FSMContext) -> None:
-    region = callback.data.split(":", 1)[1]
-    if region not in REGIONS:
-        await callback.answer("Noto'g'ri hudud.", show_alert=True)
+@router.callback_query(OrderCreation.village, F.data.startswith("vpg:c:"))
+async def client_village_page(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    await _ask_village(callback, state, session, int(callback.data.rsplit(":", 1)[1]))
+    await callback.answer()
+
+
+@router.callback_query(OrderCreation.village, F.data.startswith("vid:c:"))
+async def client_choose_village(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    village = await session.get(Village, int(callback.data.rsplit(":", 1)[1]))
+    if village is None or not village.is_active:
+        await callback.answer("Hudud topilmadi.", show_alert=True)
         return
     data = await state.get_data()
-    await state.update_data(region=region)
+    await state.update_data(village_id=village.id, custom_address=None, region=village.name)
     await state.set_state(OrderCreation.description)
     await callback.message.edit_text(
         f"Soha: <b>{html.escape(data.get('category_name', ''))}</b>\n"
-        f"Hudud: <b>{html.escape(region)}</b>\n\n"
+        f"Hudud: <b>{html.escape(village.name)}</b>\n\n"
         "Muammoni matn, rasm yoki ovozli xabar sifatida yuboring.",
         reply_markup=cancel_inline_kb(),
     )
     await callback.answer()
+
+
+@router.callback_query(OrderCreation.village, F.data == "voth:c")
+async def client_other_village(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(OrderCreation.custom_village)
+    await callback.message.edit_text("Hududingizni yozing:", reply_markup=cancel_inline_kb())
+    await callback.answer()
+
+
+@router.message(OrderCreation.custom_village, F.text)
+async def client_save_custom_village(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    settings: Settings,
+) -> None:
+    text = (message.text or "").strip()
+    if len(text) < 3:
+        await message.answer("Kamida 3 ta harf yozing.")
+        return
+    try:
+        await record_suggestion(session, message.bot, settings, suggestion_type="village", raw_text=text)
+    except ValueError:
+        await message.answer("Noto'g'ri nom.")
+        return
+    data = await state.get_data()
+    await state.update_data(village_id=None, custom_address=text, region=text)
+    await state.set_state(OrderCreation.description)
+    await message.answer(
+        f"Soha: <b>{html.escape(data.get('category_name', ''))}</b>\n"
+        f"Hudud: <b>{html.escape(text)}</b>\n\n"
+        "Muammoni matn, rasm yoki ovozli xabar sifatida yuboring.",
+        reply_markup=cancel_inline_kb(),
+    )
 
 
 @router.message(
@@ -124,6 +212,8 @@ async def save_description(
         client_id=user.id,
         category_id=category_id,
         region=region,
+        village_id=data.get("village_id"),
+        custom_address=data.get("custom_address"),
         description=description,
         voice_id=voice_id,
         photo_id=photo_id,

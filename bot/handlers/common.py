@@ -17,7 +17,7 @@ router = Router(name="common")
 HELP_TEXT = (
     "<b>Usta Topamiz</b> — Beshariq tumanidagi mijozlar va ustalarni bog'laydi.\n\n"
     "📝 Buyurtma — soha, hudud, muammo. Avval admin tekshiradi, keyin ustalarga chiqadi.\n"
-    "👷 Usta — ariza, ish rasmlari, tasdiq va ish olish.\n\n"
+    "👷 Usta — ariza, ish namunasi, tasdiq va ish olish.\n\n"
     "Jarayonni bekor qilish: xabardagi ❌ tugma yoki /cancel"
 )
 

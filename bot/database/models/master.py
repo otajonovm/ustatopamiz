@@ -22,8 +22,12 @@ class Master(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"))
-    region: Mapped[str] = mapped_column(String(100))
-    experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sub_skills: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    village_id: Mapped[int | None] = mapped_column(ForeignKey("villages.id", ondelete="SET NULL"), nullable=True)
+    custom_village: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    region: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    experience_years: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sample_photos: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[MasterStatus] = mapped_column(
         Enum(
             MasterStatus,
@@ -38,9 +42,14 @@ class Master(Base):
     rating: Mapped[float] = mapped_column(Float, default=5.0, server_default="5.0")
     completed_orders_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     warnings_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    portfolio_photo_ids: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
 
     user: Mapped["User"] = relationship(back_populates="masters")
     category: Mapped["Category"] = relationship(back_populates="masters")
+    village: Mapped["Village | None"] = relationship(back_populates="masters")
     payments: Mapped[list["SubscriptionPayment"]] = relationship(back_populates="master")
     orders: Mapped[list["Order"]] = relationship(back_populates="master")
+
+    def location_label(self) -> str:
+        if self.village is not None:
+            return self.village.name
+        return self.custom_village or self.region or "Ko'rsatilmagan"

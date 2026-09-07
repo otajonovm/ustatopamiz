@@ -25,7 +25,9 @@ class Order(Base):
     client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True)
-    region: Mapped[str] = mapped_column(String(100))
+    village_id: Mapped[int | None] = mapped_column(ForeignKey("villages.id"), nullable=True)
+    custom_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    region: Mapped[str] = mapped_column(String(100), default="", server_default="")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     voice_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     photo_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -47,3 +49,9 @@ class Order(Base):
     client: Mapped["User"] = relationship(back_populates="orders")
     category: Mapped["Category"] = relationship(back_populates="orders")
     master: Mapped["Master | None"] = relationship(back_populates="orders")
+    village: Mapped["Village | None"] = relationship(back_populates="orders")
+
+    def location_label(self) -> str:
+        if self.village is not None:
+            return self.village.name
+        return self.custom_address or self.region or "Ko'rsatilmagan"

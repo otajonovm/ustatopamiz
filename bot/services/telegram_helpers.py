@@ -2,7 +2,7 @@ import html
 import logging
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardMarkup, InputMediaPhoto, Message
 
 from bot.config import Settings
@@ -22,9 +22,10 @@ def group_id_candidates(group_id: int) -> list[int]:
 
 def format_order_group_post(order: Order, default_region: str) -> str:
     description = order.description or "Tavsif yo'q (media yuborilgan)."
+    place = order.location_label()
     return (
         f"🚨 <b>Yangi buyurtma: #{html.escape(order.category.name)}</b>\n"
-        f"📍 <b>Hudud:</b> {html.escape(default_region)}, {html.escape(order.region)}\n"
+        f"📍 <b>Hudud:</b> {html.escape(default_region)}, {html.escape(place)}\n"
         f"📝 <b>Muammo:</b> {html.escape(description)}\n"
         f"#buyurtma_{order.id}"
     )
@@ -32,23 +33,25 @@ def format_order_group_post(order: Order, default_region: str) -> str:
 
 def format_order_taken(order: Order, master_name: str) -> str:
     return (
-        f"❌ Buyurtma olindi. Usta: {html.escape(master_name)}\n"
-        f"#{html.escape(order.category.name)} · {html.escape(order.region)}\n"
+        f"❌ Ushbu buyurtma olindi. Usta: {html.escape(master_name)}\n"
+        f"#{html.escape(order.category.name)} · {html.escape(order.location_label())}\n"
         f"#buyurtma_{order.id}"
     )
 
 
 def format_master_application(master: Master, user: User, category: Category, photo_count: int = 0) -> str:
-    experience = f"{master.experience_years} yil" if master.experience_years is not None else "Ko'rsatilmagan"
+    experience = master.experience_years or "Ko'rsatilmagan"
     phone = user.phone_number or "Ko'rsatilmagan"
+    skills = master.sub_skills or "-"
     return (
         "👷 <b>Yangi usta arizasi</b>\n\n"
         f"👤 Ism: {html.escape(user.full_name)}\n"
         f"🆔 Telegram ID: <code>{user.telegram_id}</code>\n"
         f"📞 Telefon: <code>{html.escape(phone)}</code>\n"
         f"🔧 Soha: <b>{html.escape(category.name)}</b>\n"
-        f"📍 Hudud: {html.escape(master.region)}\n"
-        f"🛠 Tajriba: {html.escape(experience)}\n"
+        f"🧩 Mutaxassislik: {html.escape(skills)}\n"
+        f"📍 Hudud: {html.escape(master.location_label())}\n"
+        f"🛠 Tajriba: {html.escape(str(experience))}\n"
         f"🖼 Ish rasmlari: {photo_count} ta"
     )
 
@@ -64,8 +67,12 @@ async def send_photos_to_admins(bot: Bot, settings: Settings, photo_ids: list[st
             media = [InputMediaPhoto(media=photo_id) for photo_id in photo_ids[:10]]
             media[0].caption = caption
             await bot.send_media_group(admin_id, media=media)
-        except TelegramBadRequest:
-            logger.warning("Admin %s ga ish rasmlari yuborilmadi", admin_id)
+        except TelegramAPIError:
+            for photo_id in photo_ids:
+                try:
+                    await bot.send_photo(admin_id, photo=photo_id)
+                except TelegramAPIError:
+                    logger.warning("Admin %s ga ish rasmi yuborilmadi", admin_id)
 
 
 async def notify_admins(
@@ -77,7 +84,7 @@ async def notify_admins(
     for admin_id in settings.ADMIN_IDS:
         try:
             await bot.send_message(admin_id, text, reply_markup=reply_markup)
-        except TelegramBadRequest:
+        except TelegramAPIError:
             logger.warning("Admin %s ga xabar yuborilmadi", admin_id)
 
 

@@ -11,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from bot.config import Settings
-from bot.database.models import Category, Master, MasterStatus, PaymentStatus, SubscriptionPayment, User, UserRole
+from bot.database.models import Category, Master, MasterStatus, PaymentStatus, SubscriptionPayment, Suggestion, User, UserRole
 from bot.database.seed import bind_all_categories_to_group
 from bot.filters import IsAdmin
+from bot.keyboards.inline import recat_kb
 from bot.services.order_service import utcnow
+from bot.services.suggestion_service import approve_suggestion
 from bot.services.telegram_helpers import create_one_time_invite, notify_admins
 
 EMPTY_INLINE = InlineKeyboardMarkup(inline_keyboard=[])
@@ -111,13 +113,19 @@ async def approve_master(callback: CallbackQuery, session: AsyncSession, setting
     master = await session.scalar(
         select(Master)
         .where(Master.id == int(callback.data.rsplit(":", 1)[1]))
-        .options(selectinload(Master.user), selectinload(Master.category))
+        .options(selectinload(Master.user), selectinload(Master.category), selectinload(Master.village))
     )
     if master is None:
         await callback.answer("Ariza topilmadi.", show_alert=True)
         return
     master.status = MasterStatus.APPROVED
     master.user.role = UserRole.MASTER
+    start = utcnow()
+    until = master.subscription_until
+    if until is not None and until.tzinfo is None:
+        until = until.replace(tzinfo=start.tzinfo)
+    if until is None or until < start:
+        master.subscription_until = start + timedelta(days=settings.SUBSCRIPTION_DAYS)
     invite_link = await create_one_time_invite(
         callback.bot,
         master.category.group_id,
@@ -126,7 +134,8 @@ async def approve_master(callback: CallbackQuery, session: AsyncSession, setting
     )
     text = (
         f"✅ Arizangiz tasdiqlandi!\nSoha: <b>{html.escape(master.category.name)}</b>\n"
-        f"Hudud: {html.escape(master.region)}\n\n"
+        f"Hudud: {html.escape(master.location_label())}\n\n"
+        f"Tekin obuna: {settings.SUBSCRIPTION_DAYS} kun.\n"
         "Endi guruhdagi buyurtmalarni olishingiz mumkin.\n"
     )
     if invite_link:
@@ -167,6 +176,65 @@ async def reject_master(callback: CallbackQuery, session: AsyncSession) -> None:
     except TelegramAPIError:
         await callback.message.edit_caption(caption=f"{base}\n\n❌ Rad etildi.", reply_markup=EMPTY_INLINE)
     await callback.answer("Rad etildi.")
+
+
+@router.callback_query(F.data.startswith("master:recat:"), IsAdmin())
+async def recat_master(callback: CallbackQuery, session: AsyncSession) -> None:
+    master_id = int(callback.data.rsplit(":", 1)[1])
+    master = await session.get(Master, master_id)
+    if master is None:
+        await callback.answer("Ariza topilmadi.", show_alert=True)
+        return
+    categories = list(await session.scalars(select(Category).where(Category.is_active.is_(True)).order_by(Category.id)))
+    await callback.message.answer("To'g'ri sohani tanlang:", reply_markup=recat_kb(master_id, categories))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("master:setcat:"), IsAdmin())
+async def set_master_category(callback: CallbackQuery, session: AsyncSession) -> None:
+    _, _, master_id_raw, category_id_raw = callback.data.split(":")
+    master = await session.scalar(
+        select(Master)
+        .where(Master.id == int(master_id_raw))
+        .options(selectinload(Master.user), selectinload(Master.category))
+    )
+    category = await session.get(Category, int(category_id_raw))
+    if master is None or category is None:
+        await callback.answer("Topilmadi.", show_alert=True)
+        return
+    master.category_id = category.id
+    try:
+        await callback.bot.send_message(
+            master.user.telegram_id,
+            f"Admin sohangizni o'zgartirdi: <b>{html.escape(category.name)}</b>",
+        )
+    except TelegramAPIError:
+        logger.warning("Ustaga soha o'zgarishi yuborilmadi")
+    await callback.message.edit_text(f"Soha yangilandi: {html.escape(category.name)}")
+    await callback.answer("Soha o'zgartirildi.")
+
+
+@router.callback_query(F.data.startswith("sug:ok:"), IsAdmin())
+async def suggestion_approve(callback: CallbackQuery, session: AsyncSession) -> None:
+    suggestion = await session.get(Suggestion, int(callback.data.rsplit(":", 1)[1]))
+    if suggestion is None:
+        await callback.answer("Taklif topilmadi.", show_alert=True)
+        return
+    await approve_suggestion(session, suggestion)
+    await callback.message.edit_reply_markup(reply_markup=EMPTY_INLINE)
+    await callback.answer("Menyuga qo'shildi.")
+    await callback.message.answer(f"✅ Qo'shildi: {html.escape(suggestion.display_name)}")
+
+
+@router.callback_query(F.data.startswith("sug:no:"), IsAdmin())
+async def suggestion_reject(callback: CallbackQuery, session: AsyncSession) -> None:
+    suggestion = await session.get(Suggestion, int(callback.data.rsplit(":", 1)[1]))
+    if suggestion is None:
+        await callback.answer("Taklif topilmadi.", show_alert=True)
+        return
+    await session.delete(suggestion)
+    await callback.message.edit_reply_markup(reply_markup=EMPTY_INLINE)
+    await callback.answer("O'chirildi.")
 
 
 @router.callback_query(F.data.startswith("pay:ok:"), IsAdmin())

@@ -3,9 +3,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 class OrderCreation(StatesGroup):
     category = State()
-    region = State()
+    custom_category = State()
+    village = State()
+    custom_village = State()
     description = State()
-
-
-class RatingState(StatesGroup):
-    waiting = State()
