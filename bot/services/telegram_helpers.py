@@ -56,6 +56,14 @@ def format_master_application(master: Master, user: User, category: Category, ph
     )
 
 
+def build_photo_media_group(photo_ids: list[str], caption: str) -> list[InputMediaPhoto]:
+    """Build media-group payload. InputMediaPhoto is frozen — caption must be set at init."""
+    first, *rest = photo_ids[:10]
+    media = [InputMediaPhoto(media=first, caption=caption)]
+    media.extend(InputMediaPhoto(media=photo_id) for photo_id in rest)
+    return media
+
+
 async def send_photos_to_admins(bot: Bot, settings: Settings, photo_ids: list[str], caption: str) -> None:
     if not photo_ids:
         return
@@ -64,9 +72,7 @@ async def send_photos_to_admins(bot: Bot, settings: Settings, photo_ids: list[st
             if len(photo_ids) == 1:
                 await bot.send_photo(admin_id, photo=photo_ids[0], caption=caption)
                 continue
-            media = [InputMediaPhoto(media=photo_id) for photo_id in photo_ids[:10]]
-            media[0].caption = caption
-            await bot.send_media_group(admin_id, media=media)
+            await bot.send_media_group(admin_id, media=build_photo_media_group(photo_ids, caption))
         except TelegramAPIError:
             for photo_id in photo_ids:
                 try:
